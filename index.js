@@ -1,12 +1,19 @@
 require("dotenv").config();
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const express = require("express");
 const app = express();
+const http = require("http");
 const port = process.env.PORT || 3000;
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
+const { Server } = require("socket.io");
+const { createServer } = require("node:http");
+
 app.use(cors({ origin: ["http://localhost:5173"] }));
 app.use(express.json());
+
+const server = http.createServer(app); // Create HTTP server
+const io = new Server(server); // Create WebSocket server
 
 const uri = `mongodb+srv://${process.env.USER_NAME}:${process.env.USER_PASS}@cluster0.ds3da.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -38,11 +45,62 @@ async function run() {
 
 		app.post("/tasks", async (req, res) => {
 			const task = req.body;
+			console.log(task);
 			const result = await TaskCollection.insertOne(task);
 			res.send(result);
 		});
+
+		app.delete("/task-delete/:id", async (req, res) => {
+			const id = req.params.id;
+			console.log(id);
+			const filter = { _id: new ObjectId(id) };
+			const result = await TaskCollection.deleteOne(filter);
+			res.send(result);
+		});
+
+		app.get("/all-users", async (req, res) => {
+			const result = await UserCollection.find().toArray();
+			res.send(result);
+		});
+		app.get("/all-users/:id", async (req, res) => {
+			const id = req.params.id;
+			console.log(id);
+			const query = { _id: new ObjectId(id) };
+			const result = await UserCollection.find(query).toArray();
+			res.send(result);
+		});
+		app.get("/tasks", async (req, res) => {
+			const result = await TaskCollection.find().toArray();
+			res.send(result);
+		});
+
+		app.get("/tasks/:id", async (req, res) => {
+			const id = req.params.id;
+
+			const filter = { _id: new ObjectId(id) };
+			const result = await TaskCollection.find(filter).toArray();
+			console.log(result);
+
+			res.send(result);
+		});
+		app.patch("/update-profile/:id", async (req, res) => {
+			const user = req.body;
+			const id = req.params.id;
+			console.log(id);
+			const filter = { _id: new ObjectId(id) };
+			const updateDoc = {
+				$set: {
+					name: user.name,
+					email: user.email,
+					photoURL: user.photo,
+				},
+			};
+
+			const result = await UserCollection.updateOne(filter, updateDoc);
+			res.send(result);
+		});
 		await client.connect();
-		// Send a ping to confirm a successful connection
+
 		await client.db("admin").command({ ping: 1 });
 		console.log(
 			"Pinged your deployment. You successfully connected to MongoDB!"
@@ -52,6 +110,12 @@ async function run() {
 		// await client.close();
 	}
 }
+
+io.on("connection", (socket) => {
+	socket.on("chat message", (msg) => {
+		console.log("message: " + msg);
+	});
+});
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
@@ -59,5 +123,5 @@ app.get("/", (req, res) => {
 });
 
 app.listen(port, () => {
-	console.log(`Example app listening on port ${port}`);
+	console.log(`Server running on port ${port}`);
 });
