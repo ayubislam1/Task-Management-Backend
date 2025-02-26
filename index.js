@@ -8,17 +8,18 @@ const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const { createServer } = require("node:http");
+const { title } = require("node:process");
 
 app.use(cors({ origin: ["http://localhost:5173"] }));
 app.use(express.json());
-
+ 
 const server = http.createServer(app); // Create HTTP server
 const io = new Server(server); // Create WebSocket server
 
 const uri = `mongodb+srv://${process.env.USER_NAME}:${process.env.USER_PASS}@cluster0.ds3da.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 const client = new MongoClient(uri, {
-	serverApi: {
+	serverApi: { 
 		version: ServerApiVersion.v1,
 		strict: true,
 		deprecationErrors: true,
@@ -46,10 +47,10 @@ async function run() {
 		app.post("/tasks", async (req, res) => {
 			const task = req.body;
 			console.log(task);
-			const result = await TaskCollection.insertOne(task);
+			const result = await TaskCollection.insertOne(task); 
 			res.send(result);
 		});
-
+ 
 		app.delete("/task-delete/:id", async (req, res) => {
 			const id = req.params.id;
 			console.log(id);
@@ -86,7 +87,7 @@ async function run() {
 		app.patch("/update-profile/:id", async (req, res) => {
 			const user = req.body;
 			const id = req.params.id;
-			console.log(id);
+
 			const filter = { _id: new ObjectId(id) };
 			const updateDoc = {
 				$set: {
@@ -99,7 +100,48 @@ async function run() {
 			const result = await UserCollection.updateOne(filter, updateDoc);
 			res.send(result);
 		});
-		await client.connect();
+
+		app.patch("/task-update/:id", async (req, res) => {
+			const task = req.body;
+			const filter = { _id: new ObjectId(req.params.id) };
+			const updateTask = {
+				$set: {
+					title: task.title,
+					description: task.description,
+					category: task.category,
+					priority: task.priority,
+
+					timestamp: task.timestamp,
+				},
+			};
+
+			const result = await TaskCollection.updateOne(filter, updateTask);
+			res.send(result);
+		});
+
+		app.patch("/tasks-category/:id", async (req, res) => {
+			const user = req.body;
+
+			const id = req.params.id;
+			console.log(id);
+			const filter = { _id: new ObjectId(id) };
+
+			const updateDoc = {
+				$set: {
+					category: user.category,
+				},
+			};
+
+			const result = await TaskCollection.updateOne(filter, updateDoc);
+			res.send(result);
+		});
+
+		app.get("/task-stats", async (req, res) => {
+			const users = await UserCollection.estimatedDocumentCount();
+			const task = await TaskCollection.estimatedDocumentCount();
+			res.send({users,task})
+		}); 
+		await client.connect();         
 
 		await client.db("admin").command({ ping: 1 });
 		console.log(
